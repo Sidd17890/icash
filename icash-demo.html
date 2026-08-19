@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ICash — Biometric Wallet Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E1F;
+    --bg-elevated:#12172C;
+    --surface:#171D38;
+    --surface-2:#1D2444;
+    --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);
+    --text:#EDEFF7;
+    --text-muted:#8890B5;
+    --text-faint:#565E85;
+    --scan:#2DD4BF;
+    --scan-glow:rgba(45,212,191,0.35);
+    --money:#F5B942;
+    --money-glow:rgba(245,185,66,0.3);
+    --send:#7C8CFF;
+    --alert:#FF6B6B;
+    --alert-glow:rgba(255,107,107,0.3);
+    --radius:18px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    overflow-x:hidden;
+    min-height:100vh;
+    position:relative;
+  }
+  #bg-canvas{
+    position:fixed;inset:0;z-index:0;opacity:0.55;pointer-events:none;
+  }
+  .app{
+    position:relative;z-index:1;
+    min-height:100vh;
+    display:flex;flex-direction:column;
+  }
+  /* ---------- NAV ---------- */
+  .nav{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px 32px;
+    border-bottom:1px solid var(--border);
+    backdrop-filter:blur(6px);
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:0.5px;
+  }
+  .brand-mark{
+    width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,var(--scan),var(--send));
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:700;color:#05101a;
+  }
+  .brand-tag{
+    color:var(--text-faint);font-family:var(--font-mono);font-size:12px;font-weight:400;
+    border-left:1px solid var(--border-strong);padding-left:10px;margin-left:2px;
+  }
+  .nav-right{display:flex;align-items:center;gap:14px;font-family:var(--font-mono);font-size:12px;color:var(--text-faint);}
+  .dot-live{width:7px;height:7px;border-radius:50%;background:var(--scan);box-shadow:0 0 8px var(--scan);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+
+  /* ---------- LAYOUT ---------- */
+  .stage{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    padding:40px 20px;
+  }
+  .screen{display:none;width:100%;animation:rise .5s ease both;}
+  .screen.active{display:flex;flex-direction:column;align-items:center;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:36px;
+    width:100%;
+  }
+  .card-narrow{max-width:440px;}
+  .eyebrow{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+    color:var(--scan);margin-bottom:10px;
+  }
+  h1{font-family:var(--font-display);font-size:30px;font-weight:600;line-height:1.15;}
+  h2{font-family:var(--font-display);font-size:22px;font-weight:600;}
+  p.lead{color:var(--text-muted);font-size:14.5px;margin-top:10px;line-height:1.55;}
+
+  /* ---------- WELCOME ---------- */
+  .welcome-hero{max-width:560px;text-align:center;margin-bottom:34px;}
+  .welcome-hero .eyebrow{justify-content:center;display:flex;}
+  .welcome-hero h1{font-size:40px;}
+  .choice-row{display:flex;gap:18px;width:100%;max-width:560px;flex-wrap:wrap;}
+  .choice-card{
+    flex:1;min-width:220px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:26px;cursor:pointer;transition:all .2s ease;text-align:left;
+  }
+  .choice-card:hover{border-color:var(--scan);transform:translateY(-2px);box-shadow:0 10px 30px -12px var(--scan-glow);}
+  .choice-icon{
+    width:44px;height:44px;border-radius:12px;background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:20px;
+  }
+  .choice-card h3{font-family:var(--font-display);font-size:17px;margin-bottom:6px;}
+  .choice-card p{color:var(--text-muted);font-size:13px;line-height:1.5;}
+
+  /* ---------- FORM ---------- */
+  .field{margin-bottom:18px;}
+  .field label{
+    display:block;font-size:12px;color:var(--text-muted);margin-bottom:7px;
+    font-family:var(--font-mono);letter-spacing:0.5px;text-transform:uppercase;
+  }
+  .field input{
+    width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;
+    padding:13px 14px;color:var(--text);font-size:15px;font-family:var(--font-body);
+    outline:none;transition:border-color .15s;
+  }
+  .field input:focus{border-color:var(--scan);}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:12px;padding:13px 22px;font-size:14.5px;font-weight:600;
+    cursor:pointer;font-family:var(--font-body);transition:transform .12s ease,opacity .15s ease;
+    width:100%;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-primary{background:linear-gradient(135deg,var(--scan),#1fb5a3);color:#04211c;}
+  .btn-money{background:linear-gradient(135deg,var(--money),#d99a1f);color:#2b1c02;}
+  .btn-send{background:linear-gradient(135deg,var(--send),#5b6cf0);color:#0c1030;}
+  .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);}
+  .btn-alert{background:linear-gradient(135deg,var(--alert),#e14848);color:#2a0505;}
+  .btn-row{display:flex;gap:10px;margin-top:8px;}
+  .link-btn{
+    background:none;border:none;color:var(--text-faint);font-size:12.5px;cursor:pointer;
+    font-family:var(--font-mono);text-decoration:underline;text-underline-offset:3px;
+  }
+  .link-btn:hover{color:var(--scan);}
+
+  /* ---------- SCAN SCREEN ---------- */
+  .scan-wrap{display:flex;flex-direction:column;align-items:center;gap:22px;max-width:520px;width:100%;}
+  .scan-frame{
+    position:relative;width:380px;height:380px;border-radius:50%;
+    overflow:hidden;border:2px solid var(--border-strong);
+    background:#000;
+  }
+  .scan-frame video{
+    width:100%;height:100%;object-fit:cover;transform:scaleX(-1);
+  }
+  #scan-ring-canvas{position:absolute;inset:-40px;pointer-events:none;}
+  .scan-status{
+    position:absolute;bottom:14px;left:0;right:0;text-align:center;
+    font-family:var(--font-mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--scan);background:rgba(0,0,0,0.45);padding:8px 10px;
+  }
+  .scan-status.bad{color:var(--alert);}
+  .scan-caption{text-align:center;}
+  .scan-caption h2{margin-bottom:6px;}
+  .scan-caption p{color:var(--text-muted);font-size:13.5px;}
+  .identity-banner{
+    display:flex;align-items:center;gap:12px;background:var(--surface-2);
+    border:1px solid var(--border-strong);border-radius:14px;padding:14px 18px;width:100%;
+  }
+  .identity-banner .av{
+    width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--scan),var(--send));
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:15px;color:#05101a;
+  }
+  .identity-banner strong{font-family:var(--font-display);}
+  .identity-banner span{display:block;font-size:12px;color:var(--text-muted);}
+
+  /* ---------- DASHBOARD ---------- */
+  .dash{width:100%;max-width:920px;display:flex;flex-direction:column;gap:22px;}
+  .dash-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+  .who{display:flex;align-items:center;gap:12px;}
+  .avatar{
+    width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--scan),var(--send));
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;color:#05101a;
+  }
+  .who h2{font-size:18px;}
+  .who span{font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);}
+  .grid{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;}
+  @media(max-width:760px){.grid{grid-template-columns:1fr;}}
+
+  .balance-card{
+    background:linear-gradient(155deg,var(--surface-2),var(--surface));
+    border:1px solid var(--border);border-radius:var(--radius);padding:30px;
+    position:relative;overflow:hidden;
+  }
+  .balance-card .eyebrow{color:var(--money);}
+  .balance-amt{
+    font-family:var(--font-mono);font-size:42px;font-weight:700;margin:8px 0 2px;
+    color:var(--money);text-shadow:0 0 24px var(--money-glow);
+  }
+  .balance-sub{color:var(--text-faint);font-size:12.5px;font-family:var(--font-mono);}
+  .action-row{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;}
+  .action-row .btn{width:auto;flex:1;min-width:130px;}
+
+  .panel{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;
+  }
+  .panel h3{font-family:var(--font-display);font-size:15px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+  .tx-list{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow-y:auto;}
+  .tx{
+    display:flex;align-items:center;justify-content:space-between;padding:11px 4px;
+    border-bottom:1px solid var(--border);
+  }
+  .tx:last-child{border-bottom:none;}
+  .tx-left{display:flex;align-items:center;gap:10px;}
+  .tx-icon{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--surface-2);}
+  .tx-title{font-size:13.5px;font-weight:500;}
+  .tx-time{font-size:11px;color:var(--text-faint);font-family:var(--font-mono);}
+  .tx-amt{font-family:var(--font-mono);font-weight:700;font-size:13.5px;}
+  .tx-amt.neg{color:var(--alert);}
+  .tx-amt.pos{color:var(--scan);}
+  .empty{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;font-family:var(--font-mono);}
+
+  .users-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .user-chip{
+    font-family:var(--font-mono);font-size:11px;color:var(--text-muted);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;
+  }
+
+  /* ---------- MODAL ---------- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(4,6,16,0.72);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:20;padding:20px;
+  }
+  .modal-backdrop.active{display:flex;}
+  .modal{
+    background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);
+    padding:30px;width:100%;max-width:460px;
+  }
+  .modal h2{margin-bottom:4px;}
+  .modal .lead{margin-bottom:20px;}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px;}
+  .chip{
+    font-family:var(--font-mono);font-size:12.5px;background:var(--bg-elevated);
+    border:1px solid var(--border);color:var(--text-muted);border-radius:9px;padding:8px 12px;cursor:pointer;
+  }
+  .chip:hover{border-color:var(--money);color:var(--money);}
+  select{
+    width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;
+    padding:13px 14px;color:var(--text);font-size:14.5px;font-family:var(--font-body);outline:none;
+  }
+  .modal-msg{font-size:12.5px;font-family:var(--font-mono);margin-top:10px;min-height:16px;}
+  .modal-msg.err{color:var(--alert);}
+  .modal-msg.ok{color:var(--scan);}
+  .close-x{
+    position:absolute;top:16px;right:18px;background:none;border:none;color:var(--text-faint);
+    font-size:18px;cursor:pointer;
+  }
+  .modal{position:relative;}
+
+  /* ---------- LOADER ---------- */
+  .loader-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;}
+  .loader-ring{
+    width:56px;height:56px;border-radius:50%;border:3px solid var(--border-strong);
+    border-top-color:var(--scan);animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .footnote{
+    text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;
+    padding:18px;letter-spacing:0.3px;
+  }
+  #cam-error{color:var(--alert);font-size:12.5px;font-family:var(--font-mono);text-align:center;max-width:340px;}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="app">
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-mark">iC</div>
+      ICash <span class="brand-tag">biometric wallet · demo build</span>
+    </div>
+    <div class="nav-right">
+      <span class="dot-live"></span> <span id="nav-status">on-device face auth active</span>
+    </div>
+  </div>
+
+  <div class="stage">
+
+    <!-- LOADING MODELS -->
+    <div class="screen active" id="screen-loading">
+      <div class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div>
+          <h2>Booting biometric engine</h2>
+          <p class="lead" id="loading-text">Loading on-device face recognition models…</p>
+          <button class="btn btn-primary" id="retry-btn" style="display:none;margin-top:16px;" onclick="retryLoadModels()">Retry loading models</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELCOME -->
+    <div class="screen" id="screen-welcome">
+      <div class="welcome-hero">
+        <div class="eyebrow">First demo build</div>
+        <h1>Your face is your wallet.</h1>
+        <p class="lead">ICash authenticates every login and transaction with on-device face recognition — no passwords, no cards. Register once, then just look at the camera.</p>
+      </div>
+      <div class="choice-row">
+        <div class="choice-card" onclick="goTo('screen-register-form')">
+          <div class="choice-icon">＋</div>
+          <h3>Register a new account</h3>
+          <p>Enter your details, scan your face once, and get demo funds instantly.</p>
+        </div>
+        <div class="choice-card" onclick="startLogin()">
+          <div class="choice-icon">◎</div>
+          <h3>Login with face scan</h3>
+          <p>Already registered? Look at the camera to unlock your wallet.</p>
+        </div>
+      </div>
+      <div class="users-strip" id="registered-strip"></div>
+      <button class="link-btn" style="margin-top:22px;" onclick="goTo('screen-delegate-collect')">Withdrawing on behalf of a senior citizen? Use their OTP instead →</button>
+    </div>
+
+    <!-- DELEGATED WITHDRAWAL: TRUSTED CONTACT ENTERS OTP -->
+    <div class="screen" id="screen-delegate-collect">
+      <div class="card card-narrow">
+        <div class="eyebrow">Trusted contact withdrawal</div>
+        <h2>Enter the senior citizen's details</h2>
+        <p class="lead" style="margin-bottom:22px;">You'll need the name they registered with and the OTP they shared with you. It's valid for 5 minutes from when they generated it.</p>
+        <div class="field">
+          <label>Senior citizen's full name</label>
+          <input id="delegate-collect-name" placeholder="Exact name used at registration" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>6-digit OTP</label>
+          <input id="delegate-collect-otp" maxlength="6" inputmode="numeric" placeholder="••••••" autocomplete="off"/>
+        </div>
+        <div class="modal-msg err" id="delegate-collect-msg"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTo('screen-welcome')">Back</button>
+          <button class="btn btn-primary" onclick="attemptDelegateWithdraw()">Verify & release funds</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DELEGATED WITHDRAWAL: SUCCESS -->
+    <div class="screen" id="screen-delegate-success">
+      <div class="card card-narrow" style="text-align:center;">
+        <div class="choice-icon" style="margin:0 auto 16px;background:rgba(45,212,191,0.12);color:var(--scan);">✓</div>
+        <h2 id="delegate-success-title">Funds released</h2>
+        <p class="lead" id="delegate-success-detail"></p>
+        <button class="btn btn-primary" onclick="goTo('screen-welcome')">Done</button>
+      </div>
+    </div>
+
+    <!-- REGISTER: DETAILS -->
+    <div class="screen" id="screen-register-form">
+      <div class="card card-narrow">
+        <div class="eyebrow">Step 1 of 2</div>
+        <h2>Create your ICash identity</h2>
+        <p class="lead" style="margin-bottom:22px;">This info stays on this device for the demo session.</p>
+        <div class="field">
+          <label>Full name</label>
+          <input id="reg-name" placeholder="e.g. Sidd Paul" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>Date of birth</label>
+          <input id="reg-dob" type="date" onchange="handleDobChange()"/>
+          <p id="reg-age-note" style="color:var(--text-faint);font-size:11.5px;font-family:var(--font-mono);margin-top:7px;"></p>
+        </div>
+        <div class="field">
+          <label>4-digit backup PIN (accessibility fallback)</label>
+          <input id="reg-pin" placeholder="e.g. 4821" maxlength="4" inputmode="numeric" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>4-digit emergency PIN (duress code)</label>
+          <input id="reg-emergency-pin" placeholder="Different from above, e.g. 9317" maxlength="4" inputmode="numeric" autocomplete="off"/>
+          <p style="color:var(--text-faint);font-size:11.5px;font-family:var(--font-mono);margin-top:7px;line-height:1.5;">If you're ever forced to access your wallet under threat, enter this PIN instead. It unlocks normally but silently flags a duress alert.</p>
+        </div>
+        <div class="field" id="reg-senior-block" style="display:none;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:12px;padding:16px;">
+          <label style="color:var(--money);">Senior citizen mode · trusted emergency contact</label>
+          <input id="reg-emergency-contact-name" placeholder="Contact's name (optional)" style="margin-bottom:8px;" autocomplete="off"/>
+          <input id="reg-emergency-contact-phone" placeholder="10-digit mobile number" inputmode="numeric" maxlength="10" autocomplete="off"/>
+          <p style="color:var(--text-faint);font-size:11.5px;font-family:var(--font-mono);margin-top:7px;line-height:1.5;">This person can withdraw on your behalf using a one-time OTP sent to you — valid for 5 minutes per request.</p>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTo('screen-welcome')">Back</button>
+          <button class="btn btn-primary" onclick="proceedToFaceCapture()">Continue to face scan →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGISTER: FACE CAPTURE -->
+    <div class="screen" id="screen-register-scan">
+      <div class="scan-wrap">
+        <div class="scan-caption">
+          <div class="eyebrow" style="text-align:center;">Step 2 of 2</div>
+          <h2>Look straight at the camera</h2>
+          <p>Good lighting, only one face in frame. This becomes your login key.</p>
+        </div>
+        <div class="scan-frame">
+          <video id="reg-video" autoplay muted playsinline></video>
+          <canvas id="scan-ring-canvas-reg" class="scan-ring-canvas"></canvas>
+          <div class="scan-status" id="reg-scan-status">positioning…</div>
+        </div>
+        <div id="reg-cam-error" style="display:none;"></div>
+        <div class="btn-row" style="width:100%;max-width:360px;">
+          <button class="btn btn-ghost" onclick="cancelRegisterScan()">Cancel</button>
+          <button class="btn btn-primary" id="reg-capture-btn" onclick="captureRegisterFace()" disabled>Capture face</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGIN: FACE SCAN -->
+    <div class="screen" id="screen-login-scan">
+      <div class="scan-wrap">
+        <div class="scan-caption">
+          <div class="eyebrow" style="text-align:center;">Step 1 of 2 · Face scan</div>
+          <h2>Scanning for a match…</h2>
+          <p>ICash compares your face against every registered identity on this device. Only one face in frame at a time. You'll confirm with your PIN next.</p>
+        </div>
+        <div class="scan-frame">
+          <video id="login-video" autoplay muted playsinline></video>
+          <canvas id="scan-ring-canvas-login" class="scan-ring-canvas"></canvas>
+          <div class="scan-status" id="login-scan-status">positioning…</div>
+        </div>
+        <div id="login-cam-error" style="display:none;"></div>
+        <div class="btn-row" style="width:100%;max-width:360px;">
+          <button class="btn btn-ghost" onclick="cancelLoginScan()">Cancel</button>
+          <button class="btn btn-primary" id="login-capture-btn" onclick="captureLoginFace()" disabled>Scan & continue</button>
+        </div>
+        <button class="link-btn" onclick="goTo('screen-pin-login')">Trouble scanning? Use backup PIN instead</button>
+      </div>
+    </div>
+
+    <!-- LOGIN: PIN CONFIRMATION (2nd factor after a successful face match) -->
+    <div class="screen" id="screen-login-pin">
+      <div class="scan-wrap">
+        <div class="scan-caption">
+          <div class="eyebrow" style="text-align:center;">Step 2 of 2 · PIN confirmation</div>
+          <h2>Confirm it's you</h2>
+          <p>Face matched — enter your PIN to finish unlocking the wallet.</p>
+        </div>
+        <div class="identity-banner" id="login-pin-banner"></div>
+        <div class="card card-narrow" style="padding:22px;width:100%;">
+          <div class="field" style="margin-bottom:12px;">
+            <label>4-digit PIN</label>
+            <input id="login-pin-input" placeholder="••••" maxlength="4" inputmode="numeric"/>
+          </div>
+          <div class="modal-msg err" id="login-pin-msg"></div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goTo('screen-welcome')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitLoginPin()">Unlock wallet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGIN: PIN FALLBACK -->
+    <div class="screen" id="screen-pin-login">
+      <div class="card card-narrow">
+        <div class="eyebrow">Accessibility fallback</div>
+        <h2>Login with PIN</h2>
+        <p class="lead" style="margin-bottom:22px;">For users whose face can't be verified — same account, same balance.</p>
+        <div class="field">
+          <label>Full name</label>
+          <input id="pin-login-name" placeholder="Exact name used at registration"/>
+        </div>
+        <div class="field">
+          <label>4-digit PIN</label>
+          <input id="pin-login-pin" placeholder="••••" maxlength="4" inputmode="numeric"/>
+        </div>
+        <div class="modal-msg err" id="pin-login-msg"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTo('screen-welcome')">Back</button>
+          <button class="btn btn-primary" onclick="attemptPinLogin()">Unlock wallet</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATCH RESULT -->
+    <div class="screen" id="screen-match">
+      <div class="scan-wrap">
+        <div class="identity-banner" id="match-banner"></div>
+        <button class="btn btn-primary" style="max-width:320px;" onclick="enterDashboard()">Continue to wallet →</button>
+      </div>
+    </div>
+
+    <!-- NO MATCH -->
+    <div class="screen" id="screen-no-match">
+      <div class="card card-narrow" style="text-align:center;">
+        <div class="choice-icon" style="margin:0 auto 16px;background:rgba(255,107,107,0.12);color:var(--alert);">✕</div>
+        <h2>Face not recognized</h2>
+        <p class="lead">This face doesn't match any registered ICash identity on this device.</p>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goTo('screen-welcome')">Back</button>
+          <button class="btn btn-primary" onclick="startLogin()">Try scan again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="screen" id="screen-dashboard">
+      <div class="dash">
+        <div id="dash-alert-banner" style="display:none;background:linear-gradient(135deg,rgba(255,107,107,0.16),rgba(255,107,107,0.06));border:1px solid var(--alert);border-radius:14px;padding:14px 18px;font-family:var(--font-mono);font-size:12.5px;color:var(--alert);"></div>
+        <div class="dash-top">
+          <div class="who">
+            <div class="avatar" id="dash-avatar"></div>
+            <div>
+              <h2 id="dash-name">—</h2>
+              <span id="dash-acct">—</span>
+            </div>
+          </div>
+          <button class="btn btn-ghost" style="width:auto;" onclick="logout()">Log out</button>
+        </div>
+
+        <div class="grid">
+          <div class="balance-card">
+            <div class="eyebrow">Available balance</div>
+            <div class="balance-amt" id="dash-balance">₹0</div>
+            <div class="balance-sub">Demo funds · not real currency</div>
+            <div class="action-row">
+              <button class="btn btn-money" onclick="openModal('withdraw')">↓ Withdraw</button>
+              <button class="btn btn-send" onclick="openModal('send')">↗ Send money</button>
+              <button class="btn btn-ghost" onclick="addDemoFunds()">＋ Top up ₹5,000</button>
+              <button class="btn btn-ghost" id="senior-delegate-btn" style="display:none;" onclick="openDelegateModal()">🛡️ Authorize trusted contact</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Registered identities <span style="font-family:var(--font-mono);font-weight:400;font-size:11px;color:var(--text-faint);" id="user-count">0</span></h3>
+            <div class="users-strip" id="dash-users-strip"></div>
+            <p class="lead" style="margin-top:14px;font-size:12px;">Register a second face on this device, then log out and scan again to see ICash tell the two identities apart.</p>
+            <button class="btn btn-ghost" style="margin-top:14px;" onclick="goTo('screen-register-form')">＋ Register another identity</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Transaction history</h3>
+          <div class="tx-list" id="tx-list">
+            <div class="empty">No transactions yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footnote">Face matching runs fully client-side via face-api.js — no images or descriptors leave this browser. Demo build for evaluation only, not a real financial product.</div>
+</div>
+
+<!-- WITHDRAW MODAL -->
+<div class="modal-backdrop" id="modal-withdraw">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('withdraw')">✕</button>
+    <h2>Withdraw cash</h2>
+    <p class="lead">Simulated ATM withdrawal from your ICash balance.</p>
+    <div class="chip-row">
+      <div class="chip" onclick="setAmt('withdraw',500)">₹500</div>
+      <div class="chip" onclick="setAmt('withdraw',1000)">₹1,000</div>
+      <div class="chip" onclick="setAmt('withdraw',2000)">₹2,000</div>
+      <div class="chip" onclick="setAmt('withdraw',5000)">₹5,000</div>
+    </div>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input id="withdraw-amt" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="modal-msg" id="withdraw-msg"></div>
+    <button class="btn btn-money" style="margin-top:6px;" onclick="confirmWithdraw()">Confirm withdrawal</button>
+  </div>
+</div>
+
+<!-- SEND MODAL -->
+<div class="modal-backdrop" id="modal-send">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('send')">✕</button>
+    <h2>Send money</h2>
+    <p class="lead">Send to another registered identity, or an external name for the demo.</p>
+    <div class="field">
+      <label>Recipient</label>
+      <select id="send-recipient-select">
+        <option value="__external">Someone else (type name)…</option>
+      </select>
+    </div>
+    <div class="field" id="send-external-wrap">
+      <label>Recipient name</label>
+      <input id="send-external-name" placeholder="e.g. Rohan's Chaiwala"/>
+    </div>
+    <div class="chip-row">
+      <div class="chip" onclick="setAmt('send',200)">₹200</div>
+      <div class="chip" onclick="setAmt('send',500)">₹500</div>
+      <div class="chip" onclick="setAmt('send',1500)">₹1,500</div>
+    </div>
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input id="send-amt" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="modal-msg" id="send-msg"></div>
+    <button class="btn btn-send" style="margin-top:6px;" onclick="confirmSend()">Confirm & send</button>
+  </div>
+</div>
+
+<!-- FACE VERIFY MODAL (required before withdraw / send) -->
+<div class="modal-backdrop" id="modal-verify">
+  <div class="modal">
+    <button class="close-x" onclick="cancelVerify()">✕</button>
+    <h2 id="verify-title">Verify it's you</h2>
+    <p class="lead" id="verify-lead">Scan your face to authorize this transaction.</p>
+    <div class="scan-wrap" style="gap:16px;">
+      <div class="scan-frame" style="width:280px;height:280px;">
+        <video id="verify-video" autoplay muted playsinline></video>
+        <canvas id="scan-ring-canvas-verify" class="scan-ring-canvas"></canvas>
+        <div class="scan-status" id="verify-scan-status">positioning…</div>
+      </div>
+      <div id="verify-cam-error" style="display:none;"></div>
+      <div class="btn-row" style="width:100%;">
+        <button class="btn btn-ghost" onclick="cancelVerify()">Cancel</button>
+        <button class="btn btn-primary" id="verify-capture-btn" onclick="captureVerifyFace()" disabled>Verify & authorize</button>
+      </div>
+      <button class="link-btn" onclick="toggleVerifyPin()">Trouble scanning? Use backup PIN instead</button>
+      <div id="verify-pin-block" style="display:none;width:100%;">
+        <div class="field" style="margin-bottom:10px;">
+          <input id="verify-pin-input" placeholder="4-digit PIN" maxlength="4" inputmode="numeric"/>
+        </div>
+        <button class="btn btn-money" onclick="submitVerifyPin()">Authorize with PIN</button>
+      </div>
+    </div>
+    <div class="modal-msg" id="verify-msg"></div>
+  </div>
+</div>
+
+<!-- SENIOR CITIZEN: GENERATE DELEGATE OTP -->
+<div class="modal-backdrop" id="modal-delegate">
+  <div class="modal">
+    <button class="close-x" onclick="closeModal('delegate')">✕</button>
+    <h2>Authorize a trusted contact</h2>
+    <p class="lead">Generate an OTP so <span id="delegate-contact-label">your trusted contact</span> can withdraw on your behalf. Valid for 5 minutes.</p>
+    <div class="field">
+      <label>Amount to authorize (₹)</label>
+      <input id="delegate-amt" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="modal-msg" id="delegate-msg"></div>
+    <button class="btn btn-money" onclick="generateDelegateOtp()">Generate & send OTP</button>
+    <div id="delegate-otp-display" style="display:none;margin-top:18px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:1px;text-transform:uppercase;">OTP (demo — normally sent via SMS)</div>
+      <div style="font-family:var(--font-mono);font-size:32px;font-weight:700;color:var(--money);margin:8px 0;letter-spacing:4px;" id="delegate-otp-code">------</div>
+      <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);" id="delegate-otp-timer">valid for 5:00</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<script>
+/* ============================================================
+   ICASH — DEMO STATE
+   ============================================================ */
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+const MATCH_THRESHOLD = 0.6;   // standard face-api recognition threshold (euclidean distance)
+const SAMPLES_PER_USER = 3;    // face samples captured at registration, for robust matching
+const STARTING_BALANCE = 25000;
+function detOpts(){
+  return new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.5 });
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// Age from a yyyy-mm-dd date-input value. Returns null if not a valid date.
+function computeAge(dobStr){
+  const dob = new Date(dobStr);
+  if(isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if(m < 0 || (m===0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+// Toggles the senior-citizen emergency-contact block on the registration
+// form as soon as a DOB implying age 60+ is entered.
+function handleDobChange(){
+  const dobVal = document.getElementById('reg-dob').value;
+  const age = computeAge(dobVal);
+  const block = document.getElementById('reg-senior-block');
+  const note = document.getElementById('reg-age-note');
+  if(age === null || age < 0){
+    block.style.display = 'none';
+    note.textContent = '';
+    return;
+  }
+  if(age >= 60){
+    block.style.display = 'block';
+    note.textContent = `Age ${age} — senior citizen mode enabled.`;
+    note.style.color = 'var(--scan)';
+  } else {
+    block.style.display = 'none';
+    note.textContent = `Age ${age}`;
+    note.style.color = 'var(--text-faint)';
+  }
+}
+
+// Live-preview face count (cheap, no descriptor calc) — used to drive the
+// "align your face" / "two faces detected" status messages.
+async function countFaces(video){
+  const dets = await faceapi.detectAllFaces(video, detOpts());
+  return dets.length;
+}
+// Full capture with descriptor(s) — used when actually taking a reference
+// sample or a verification snapshot. Returns {count, result} where result
+// is only set when exactly one face was found.
+async function detectSingleFaceStrict(video){
+  const dets = await faceapi.detectAllFaces(video, detOpts()).withFaceLandmarks().withFaceDescriptors();
+  return { count: dets.length, result: dets.length === 1 ? dets[0] : null };
+}
+// Applies a face-count reading to a status line + capture button, shared by
+// the register / login / verify live-preview loops.
+function applyFaceCountStatus(count, statusEl, btn){
+  if(count === 1){
+    statusEl.textContent = 'face detected — ready';
+    statusEl.classList.remove('bad');
+    btn.disabled = false;
+  } else if(count > 1){
+    statusEl.textContent = 'two faces detected — only one person at a time';
+    statusEl.classList.add('bad');
+    btn.disabled = true;
+  } else {
+    statusEl.textContent = 'align your face in the circle, in good light';
+    statusEl.classList.add('bad');
+    btn.disabled = true;
+  }
+}
+
+/* ============================================================
+   DURESS / EMERGENCY PIN ALERTS
+   ============================================================ */
+function showAlertToast(text){
+  let toast = document.getElementById('global-toast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'global-toast';
+    toast.style.cssText = 'position:fixed;top:22px;left:50%;transform:translateX(-50%);' +
+      'background:linear-gradient(135deg,#FF6B6B,#e14848);color:#2a0505;padding:14px 22px;' +
+      'border-radius:12px;font-family:var(--font-mono);font-size:12.5px;font-weight:700;' +
+      'z-index:999;box-shadow:0 10px 30px rgba(255,107,107,0.45);max-width:90vw;text-align:center;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>{ toast.style.display = 'none'; }, 3800);
+}
+function triggerDuressAlert(user){
+  if(!user.securityAlerts) user.securityAlerts = [];
+  user.securityAlerts.push({ time: nowStr() });
+  showAlertToast('🚨 Emergency PIN detected — duress alert logged. In a real deployment this silently notifies emergency contacts while the wallet keeps working normally.');
+}
+
+let users = [];          // {id, name, pin, descriptor(Float32Array), balance, txs:[]}
+let currentUser = null;
+let modelsReady = false;
+
+function fmtMoney(n){
+  return '₹' + Number(n).toLocaleString('en-IN');
+}
+function nowStr(){
+  return new Date().toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+}
+function initials(name){
+  return name.trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
+}
+
+/* ============================================================
+   SCREEN NAV
+   ============================================================ */
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  refreshRegisteredStrip();
+}
+
+/* ============================================================
+   THREE.JS — AMBIENT BACKGROUND
+   ============================================================ */
+let bgScene, bgCamera, bgRenderer, bgPoints;
+function initBgScene(){
+  const canvas = document.getElementById('bg-canvas');
+  bgRenderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  bgRenderer.setSize(window.innerWidth, window.innerHeight);
+  bgRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+
+  bgScene = new THREE.Scene();
+  bgCamera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  bgCamera.position.z = 60;
+
+  const count = 500;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    positions[i*3] = (Math.random()-0.5)*220;
+    positions[i*3+1] = (Math.random()-0.5)*220;
+    positions[i*3+2] = (Math.random()-0.5)*220;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  const mat = new THREE.PointsMaterial({color:0x2dd4bf, size:1.1, transparent:true, opacity:0.55});
+  bgPoints = new THREE.Points(geo, mat);
+  bgScene.add(bgPoints);
+
+  const ringGeo = new THREE.TorusGeometry(38, 0.15, 8, 100);
+  const ringMat = new THREE.MeshBasicMaterial({color:0x7c8cff, transparent:true, opacity:0.25});
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI/2.3;
+  bgScene.add(ring);
+  bgScene.userData.ring = ring;
+
+  animateBg();
+  window.addEventListener('resize', ()=>{
+    bgCamera.aspect = window.innerWidth/window.innerHeight;
+    bgCamera.updateProjectionMatrix();
+    bgRenderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+function animateBg(){
+  requestAnimationFrame(animateBg);
+  bgPoints.rotation.y += 0.0009;
+  bgPoints.rotation.x += 0.0003;
+  bgScene.userData.ring.rotation.z += 0.0025;
+  bgRenderer.render(bgScene, bgCamera);
+}
+
+/* ============================================================
+   THREE.JS — SCAN RING (rendered over the camera circles)
+   ============================================================ */
+function createScanRingRenderer(canvasEl, size){
+  size = size || 460; // matches the default 380px scan-frame + 80px ring margin
+  const renderer = new THREE.WebGLRenderer({canvas:canvasEl, alpha:true, antialias:true});
+  renderer.setSize(size,size);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50,1,0.1,100);
+  camera.position.z = 8;
+
+  const group = new THREE.Group();
+  for(let i=0;i<3;i++){
+    const g = new THREE.RingGeometry(3.0+i*0.35, 3.08+i*0.35, 64);
+    const m = new THREE.MeshBasicMaterial({color:0x2dd4bf, transparent:true, opacity:0.5-i*0.12, side:THREE.DoubleSide});
+    const mesh = new THREE.Mesh(g,m);
+    group.add(mesh);
+  }
+  // sweep arc
+  const arcGeo = new THREE.RingGeometry(2.9, 3.5, 32, 1, 0, Math.PI*0.35);
+  const arcMat = new THREE.MeshBasicMaterial({color:0x2dd4bf, transparent:true, opacity:0.55, side:THREE.DoubleSide});
+  const arc = new THREE.Mesh(arcGeo, arcMat);
+  group.add(arc);
+  scene.add(group);
+
+  let raf;
+  function loop(){
+    raf = requestAnimationFrame(loop);
+    arc.rotation.z -= 0.045;
+    group.rotation.z += 0.003;
+    renderer.render(scene, camera);
+  }
+  loop();
+  return {
+    setColor(hex){ group.children.forEach(m=>m.material.color.setHex(hex)); arc.material.color.setHex(hex); },
+    stop(){ cancelAnimationFrame(raf); }
+  };
+}
+
+/* ============================================================
+   FACE-API MODEL LOADING
+   ============================================================ */
+async function loadModels(){
+  document.getElementById('retry-btn').style.display = 'none';
+  document.getElementById('loading-text').textContent = 'Loading on-device face recognition models…';
+  try{
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    modelsReady = true;
+    goTo('screen-welcome');
+  }catch(err){
+    document.getElementById('loading-text').innerHTML =
+      'Could not load the face-recognition models. This needs an active internet connection on first load (models are fetched from a CDN, then cached by the browser).<br><br>' +
+      '<span style="font-family:var(--font-mono);font-size:11px;color:var(--alert);">' + (err && err.message ? err.message : String(err)) + '</span>';
+    document.getElementById('retry-btn').style.display = 'inline-flex';
+    console.error(err);
+  }
+}
+function retryLoadModels(){ loadModels(); }
+
+/* ============================================================
+   CAMERA HELPERS
+   ============================================================ */
+async function startCamera(videoEl, errEl){
+  errEl.style.display = 'none';
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:480},height:{ideal:480}}});
+    videoEl.srcObject = stream;
+    return stream;
+  }catch(err){
+    errEl.style.display = 'block';
+    errEl.textContent = 'Camera access denied or unavailable. Allow camera permissions and retry, or use the PIN fallback.';
+    throw err;
+  }
+}
+function stopCamera(videoEl){
+  const stream = videoEl.srcObject;
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+  videoEl.srcObject = null;
+}
+
+/* ============================================================
+   REGISTER FLOW
+   ============================================================ */
+let regStream, regRing, regDetectLoop, regLastDetection = null;
+
+function proceedToFaceCapture(){
+  const name = document.getElementById('reg-name').value.trim();
+  const dobVal = document.getElementById('reg-dob').value;
+  const pin = document.getElementById('reg-pin').value.trim();
+  const emergencyPin = document.getElementById('reg-emergency-pin').value.trim();
+  if(!name){ alert('Enter your name to continue.'); return; }
+  if(!dobVal){ alert('Enter your date of birth.'); return; }
+  const age = computeAge(dobVal);
+  if(age === null || age < 0 || age > 120){ alert('Enter a valid date of birth.'); return; }
+  if(!/^\d{4}$/.test(pin)){ alert('Enter a 4-digit numeric PIN.'); return; }
+  if(!/^\d{4}$/.test(emergencyPin)){ alert('Enter a 4-digit numeric emergency PIN.'); return; }
+  if(pin === emergencyPin){ alert('Your emergency PIN must be different from your normal PIN.'); return; }
+  const isSenior = age >= 60;
+  let contactName = '', contactPhone = '';
+  if(isSenior){
+    contactName = document.getElementById('reg-emergency-contact-name').value.trim();
+    contactPhone = document.getElementById('reg-emergency-contact-phone').value.trim();
+    if(!/^\d{10}$/.test(contactPhone)){ alert('Senior citizen accounts need a 10-digit trusted emergency contact number.'); return; }
+  }
+  if(users.some(u=>u.name.toLowerCase()===name.toLowerCase())){
+    alert('That name is already registered on this device. Try logging in instead.');
+    return;
+  }
+  goTo('screen-register-scan');
+  beginRegisterScan(name, pin, emergencyPin, { dob: dobVal, age, isSenior, contactName, contactPhone });
+}
+
+async function beginRegisterScan(name, pin, emergencyPin, seniorInfo){
+  const video = document.getElementById('reg-video');
+  const errEl = document.getElementById('reg-cam-error');
+  const statusEl = document.getElementById('reg-scan-status');
+  const btn = document.getElementById('reg-capture-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'starting camera…';
+  if(!regRing) regRing = createScanRingRenderer(document.getElementById('scan-ring-canvas-reg'));
+
+  try{
+    regStream = await startCamera(video, errEl);
+  }catch(e){ return; }
+
+  video.dataset.name = name;
+  video.dataset.pin = pin;
+  video.dataset.emergencyPin = emergencyPin;
+  video.dataset.dob = seniorInfo.dob;
+  video.dataset.age = String(seniorInfo.age);
+  video.dataset.isSenior = String(seniorInfo.isSenior);
+  video.dataset.contactName = seniorInfo.contactName;
+  video.dataset.contactPhone = seniorInfo.contactPhone;
+
+  regDetectLoop = setInterval(async ()=>{
+    if(!modelsReady) return;
+    const count = await countFaces(video);
+    applyFaceCountStatus(count, statusEl, btn);
+  }, 350);
+}
+
+async function captureRegisterFace(){
+  const video = document.getElementById('reg-video');
+  const statusEl = document.getElementById('reg-scan-status');
+  const btn = document.getElementById('reg-capture-btn');
+  btn.disabled = true;
+  clearInterval(regDetectLoop); // stop the live-preview loop while we take reference samples
+
+  const descriptors = [];
+  for(let i=0; i<SAMPLES_PER_USER; i++){
+    statusEl.textContent = `capturing sample ${i+1} of ${SAMPLES_PER_USER} — hold still`;
+    statusEl.classList.remove('bad');
+    const { count, result } = await detectSingleFaceStrict(video);
+    if(count > 1){
+      statusEl.textContent = 'two faces detected — only one person can register at a time';
+      statusEl.classList.add('bad');
+      btn.disabled = false;
+      regDetectLoop = setInterval(async ()=>{
+        if(!modelsReady) return;
+        applyFaceCountStatus(await countFaces(video), statusEl, btn);
+      }, 350);
+      return;
+    }
+    if(result) descriptors.push(Array.from(result.descriptor));
+    await sleep(450);
+  }
+
+  if(descriptors.length < 2){
+    statusEl.textContent = 'could not get a clear enough scan — try again with better lighting';
+    statusEl.classList.add('bad');
+    btn.disabled = false;
+    regDetectLoop = setInterval(async ()=>{
+      if(!modelsReady) return;
+      applyFaceCountStatus(await countFaces(video), statusEl, btn);
+    }, 350);
+    return;
+  }
+
+  const name = video.dataset.name;
+  const pin = video.dataset.pin;
+  const emergencyPin = video.dataset.emergencyPin;
+  const isSenior = video.dataset.isSenior === 'true';
+  const user = {
+    id: 'ic_' + Math.random().toString(36).slice(2,9),
+    name, pin, emergencyPin,
+    dob: video.dataset.dob,
+    age: Number(video.dataset.age),
+    isSenior,
+    emergencyContact: isSenior ? { name: video.dataset.contactName, phone: video.dataset.contactPhone } : null,
+    pendingDelegation: null,
+    descriptors,
+    balance: STARTING_BALANCE,
+    txs: [],
+    securityAlerts: []
+  };
+  users.push(user);
+  addTx(user, 'Account opened', STARTING_BALANCE, 'pos', 'Welcome bonus');
+  teardownRegisterScan();
+  currentUser = user;
+  showMatch(user, true);
+}
+
+function cancelRegisterScan(){
+  teardownRegisterScan();
+  goTo('screen-welcome');
+}
+function teardownRegisterScan(){
+  clearInterval(regDetectLoop);
+  const video = document.getElementById('reg-video');
+  stopCamera(video);
+}
+
+/* ============================================================
+   LOGIN FLOW (FACE)
+   ============================================================ */
+let loginStream, loginRing, loginDetectLoop;
+
+function startLogin(){
+  if(users.length === 0){
+    alert('No identities registered yet on this device. Register first.');
+    goTo('screen-register-form');
+    return;
+  }
+  goTo('screen-login-scan');
+  beginLoginScan();
+}
+
+async function beginLoginScan(){
+  const video = document.getElementById('login-video');
+  const errEl = document.getElementById('login-cam-error');
+  const statusEl = document.getElementById('login-scan-status');
+  const btn = document.getElementById('login-capture-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'starting camera…';
+  if(!loginRing) loginRing = createScanRingRenderer(document.getElementById('scan-ring-canvas-login'));
+
+  try{
+    loginStream = await startCamera(video, errEl);
+  }catch(e){ return; }
+
+  loginDetectLoop = setInterval(async ()=>{
+    if(!modelsReady) return;
+    const count = await countFaces(video);
+    applyFaceCountStatus(count, statusEl, btn);
+  }, 350);
+}
+
+// Compares a live descriptor against every sample of every registered user,
+// and returns whichever user's closest sample is nearest.
+function bestMatchAcrossUsers(liveDescriptor){
+  let bestUser = null, bestDist = Infinity;
+  for(const u of users){
+    for(const d of u.descriptors){
+      const dist = faceapi.euclideanDistance(liveDescriptor, Float32Array.from(d));
+      if(dist < bestDist){ bestDist = dist; bestUser = u; }
+    }
+  }
+  return { user: bestUser, dist: bestDist };
+}
+// Compares a live descriptor against one specific user's stored samples only —
+// used for re-verifying "still you" before a withdrawal/send.
+function distanceToUser(liveDescriptor, user){
+  let bestDist = Infinity;
+  for(const d of user.descriptors){
+    const dist = faceapi.euclideanDistance(liveDescriptor, Float32Array.from(d));
+    if(dist < bestDist) bestDist = dist;
+  }
+  return bestDist;
+}
+
+async function captureLoginFace(){
+  const video = document.getElementById('login-video');
+  const statusEl = document.getElementById('login-scan-status');
+  statusEl.textContent = 'matching against registered identities…';
+  const { count, result } = await detectSingleFaceStrict(video);
+  if(count > 1){
+    statusEl.textContent = 'two faces detected — only one person can log in at a time';
+    statusEl.classList.add('bad');
+    return;
+  }
+  if(!result){
+    statusEl.textContent = 'no face found — try again';
+    statusEl.classList.add('bad');
+    return;
+  }
+  const { user: best, dist: bestDist } = bestMatchAcrossUsers(result.descriptor);
+  teardownLoginScan();
+  if(best && bestDist < MATCH_THRESHOLD){
+    promptLoginPin(best, bestDist);
+  } else {
+    goTo('screen-no-match');
+  }
+}
+
+function cancelLoginScan(){
+  teardownLoginScan();
+  goTo('screen-welcome');
+}
+function teardownLoginScan(){
+  clearInterval(loginDetectLoop);
+  const video = document.getElementById('login-video');
+  stopCamera(video);
+}
+
+/* ============================================================
+   LOGIN 2FA — PIN CONFIRMATION AFTER A SUCCESSFUL FACE MATCH
+   ============================================================ */
+let pendingLoginUser = null;
+
+function promptLoginPin(user, dist){
+  pendingLoginUser = user;
+  document.getElementById('login-pin-input').value = '';
+  document.getElementById('login-pin-msg').textContent = '';
+  const banner = document.getElementById('login-pin-banner');
+  banner.innerHTML = `
+    <div class="av">${initials(user.name)}</div>
+    <div>
+      <strong>Face matched — ${user.name}</strong>
+      <span>Match confidence: ${Math.round((1-dist)*100)}% · enter your PIN to finish</span>
+    </div>
+  `;
+  goTo('screen-login-pin');
+}
+
+function submitLoginPin(){
+  const pin = document.getElementById('login-pin-input').value.trim();
+  const msg = document.getElementById('login-pin-msg');
+  const u = pendingLoginUser;
+  if(!u){ goTo('screen-welcome'); return; }
+  if(pin === u.pin){
+    currentUser = u;
+    pendingLoginUser = null;
+    enterDashboard();
+  } else if(pin === u.emergencyPin){
+    triggerDuressAlert(u);
+    currentUser = u;
+    pendingLoginUser = null;
+    enterDashboard();
+  } else {
+    msg.textContent = 'Incorrect PIN. Try again.';
+    msg.className = 'modal-msg err';
+  }
+}
+
+/* ============================================================
+   PIN FALLBACK LOGIN (camera unavailable — single factor)
+   ============================================================ */
+function attemptPinLogin(){
+  const name = document.getElementById('pin-login-name').value.trim();
+  const pin = document.getElementById('pin-login-pin').value.trim();
+  const msg = document.getElementById('pin-login-msg');
+  const u = users.find(u=>u.name.toLowerCase()===name.toLowerCase() && (u.pin===pin || u.emergencyPin===pin));
+  if(!u){
+    msg.textContent = 'No match for that name + PIN combination.';
+    return;
+  }
+  msg.textContent = '';
+  if(pin === u.emergencyPin) triggerDuressAlert(u);
+  currentUser = u;
+  showMatch(u, false);
+}
+
+/* ============================================================
+   MATCH / DASHBOARD
+   ============================================================ */
+function showMatch(user, isNew, dist){
+  const banner = document.getElementById('match-banner');
+  banner.innerHTML = `
+    <div class="av">${initials(user.name)}</div>
+    <div>
+      <strong>${isNew? 'Welcome, ' : 'Identity confirmed — '}${user.name}</strong>
+      <span>${isNew? 'Account created with ' + fmtMoney(STARTING_BALANCE) + ' demo funds' : (dist!==undefined ? 'Face match confidence: ' + Math.round((1-dist)*100) + '%' : 'Verified via backup PIN')}</span>
+    </div>
+  `;
+  goTo('screen-match');
+}
+
+function enterDashboard(){
+  goTo('screen-dashboard');
+  renderDashboard();
+}
+
+function renderDashboard(){
+  const u = currentUser;
+  document.getElementById('dash-avatar').textContent = initials(u.name);
+  document.getElementById('dash-name').textContent = u.name;
+  document.getElementById('dash-acct').textContent = 'A/C ' + u.id.toUpperCase();
+  document.getElementById('dash-balance').textContent = fmtMoney(u.balance);
+  document.getElementById('user-count').textContent = users.length + ' on device';
+
+  const alertBanner = document.getElementById('dash-alert-banner');
+  if(u.securityAlerts && u.securityAlerts.length){
+    const latest = u.securityAlerts[u.securityAlerts.length-1];
+    alertBanner.style.display = 'block';
+    alertBanner.textContent = `🚨 Emergency PIN used at ${latest.time} (${u.securityAlerts.length} time${u.securityAlerts.length>1?'s':''} total) — duress alert logged for this account.`;
+  } else {
+    alertBanner.style.display = 'none';
+  }
+
+  document.getElementById('senior-delegate-btn').style.display = u.isSenior ? 'inline-flex' : 'none';
+
+  const strip = document.getElementById('dash-users-strip');
+  strip.innerHTML = users.map(x=>`<span class="user-chip">${x.name}${x.id===u.id?' (you)':''}</span>`).join('');
+
+  const list = document.getElementById('tx-list');
+  if(u.txs.length===0){
+    list.innerHTML = '<div class="empty">No transactions yet</div>';
+  } else {
+    list.innerHTML = u.txs.slice().reverse().map(t=>`
+      <div class="tx">
+        <div class="tx-left">
+          <div class="tx-icon">${t.icon}</div>
+          <div>
+            <div class="tx-title">${t.title}</div>
+            <div class="tx-time">${t.time}</div>
+          </div>
+        </div>
+        <div class="tx-amt ${t.sign}">${t.sign==='neg'?'-':'+'}${fmtMoney(Math.abs(t.amount))}</div>
+      </div>
+    `).join('');
+  }
+  refreshRegisteredStrip();
+}
+
+function refreshRegisteredStrip(){
+  const strip = document.getElementById('registered-strip');
+  if(!strip) return;
+  if(users.length===0){ strip.innerHTML=''; return; }
+  strip.innerHTML = users.map(u=>`<span class="user-chip">${u.name}</span>`).join('');
+}
+
+function addTx(user, title, amount, sign, note){
+  const icons = {'Account opened':'✨','Withdrawal':'↓','Sent':'↗','Received':'↙','Top up':'＋'};
+  user.txs.push({
+    title: title + (note? ' · ' + note : ''),
+    amount, sign,
+    icon: icons[title] || '•',
+    time: nowStr()
+  });
+}
+
+function logout(){
+  currentUser = null;
+  goTo('screen-welcome');
+}
+
+/* ============================================================
+   WITHDRAW / SEND MODALS
+   ============================================================ */
+function openModal(kind){
+  if(kind==='send'){
+    const sel = document.getElementById('send-recipient-select');
+    sel.innerHTML = '<option value="__external">Someone else (type name)…</option>' +
+      users.filter(u=>u.id!==currentUser.id).map(u=>`<option value="${u.id}">${u.name} (registered)</option>`).join('');
+    sel.onchange = ()=>{
+      document.getElementById('send-external-wrap').style.display = sel.value==='__external' ? 'block' : 'none';
+    };
+    sel.onchange();
+    document.getElementById('send-msg').textContent = '';
+  } else {
+    document.getElementById('withdraw-msg').textContent = '';
+  }
+  document.getElementById('modal-'+kind).classList.add('active');
+}
+function closeModal(kind){
+  document.getElementById('modal-'+kind).classList.remove('active');
+  if(kind === 'delegate') clearInterval(delegateOtpTimer);
+}
+function setAmt(kind, val){
+  document.getElementById(kind+'-amt').value = val;
+}
+
+/* ============================================================
+   SENIOR CITIZEN — DELEGATED WITHDRAWAL VIA TRUSTED CONTACT
+   ============================================================ */
+let delegateOtpTimer = null;
+
+// Senior citizen side: generate a 5-minute OTP for their registered
+// emergency contact to use when withdrawing on their behalf.
+function openDelegateModal(){
+  const contact = currentUser.emergencyContact;
+  document.getElementById('delegate-contact-label').textContent =
+    contact ? (contact.name ? contact.name + ' (' + contact.phone + ')' : contact.phone) : 'your trusted contact';
+  document.getElementById('delegate-amt').value = '';
+  document.getElementById('delegate-msg').textContent = '';
+  document.getElementById('delegate-otp-display').style.display = 'none';
+  clearInterval(delegateOtpTimer);
+  document.getElementById('modal-delegate').classList.add('active');
+}
+
+function generateDelegateOtp(){
+  const msg = document.getElementById('delegate-msg');
+  const amt = Number(document.getElementById('delegate-amt').value);
+  if(!amt || amt<=0){ msg.textContent='Enter a valid amount.'; msg.className='modal-msg err'; return; }
+  if(amt > currentUser.balance){ msg.textContent='Insufficient balance.'; msg.className='modal-msg err'; return; }
+
+  const otp = String(Math.floor(100000 + Math.random()*900000));
+  const createdAt = Date.now();
+  const expiresAt = createdAt + 5*60*1000; // valid 5 minutes
+  currentUser.pendingDelegation = { amount: amt, otp, createdAt, expiresAt, used:false };
+
+  msg.textContent = '';
+  document.getElementById('delegate-otp-display').style.display = 'block';
+  document.getElementById('delegate-otp-code').textContent = otp;
+  showAlertToast(`📲 OTP sent to ${currentUser.emergencyContact.phone}: ${otp} — valid 5 minutes. Share it with your trusted contact.`);
+
+  clearInterval(delegateOtpTimer);
+  updateDelegateOtpTimer();
+  delegateOtpTimer = setInterval(updateDelegateOtpTimer, 1000);
+}
+
+function updateDelegateOtpTimer(){
+  const d = currentUser && currentUser.pendingDelegation;
+  const el = document.getElementById('delegate-otp-timer');
+  if(!d || !el){ clearInterval(delegateOtpTimer); return; }
+  if(d.used){ el.textContent = 'used'; clearInterval(delegateOtpTimer); return; }
+  const remaining = d.expiresAt - Date.now();
+  if(remaining <= 0){ el.textContent = 'expired'; clearInterval(delegateOtpTimer); return; }
+  const mins = Math.floor(remaining/60000);
+  const secs = Math.floor((remaining%60000)/1000);
+  el.textContent = `valid for ${mins}:${secs.toString().padStart(2,'0')}`;
+}
+
+// Trusted contact side: no face scan, no registration — just the senior's
+// name plus the OTP the senior relayed to them, within 5 minutes.
+function attemptDelegateWithdraw(){
+  const msg = document.getElementById('delegate-collect-msg');
+  const name = document.getElementById('delegate-collect-name').value.trim();
+  const otp = document.getElementById('delegate-collect-otp').value.trim();
+  msg.textContent = '';
+  if(!name || !otp){ msg.textContent = "Enter both the senior citizen's name and the OTP."; return; }
+
+  const senior = users.find(u=>u.name.toLowerCase()===name.toLowerCase() && u.isSenior);
+  if(!senior){ msg.textContent = 'No senior citizen account found with that name on this device.'; return; }
+
+  const d = senior.pendingDelegation;
+  if(!d || d.used){ msg.textContent = 'No active OTP for this account. Ask them to generate a new one.'; return; }
+  if(Date.now() > d.expiresAt){ msg.textContent = 'This OTP has expired (valid for 5 minutes). Ask for a new one.'; return; }
+  if(otp !== d.otp){ msg.textContent = 'Incorrect OTP.'; return; }
+  if(d.amount > senior.balance){ msg.textContent = "The senior citizen's balance is now too low for this authorized amount."; return; }
+
+  senior.balance -= d.amount;
+  addTx(senior, 'Withdrawal', d.amount, 'neg', 'by trusted contact · OTP verified');
+  d.used = true;
+
+  document.getElementById('delegate-collect-name').value = '';
+  document.getElementById('delegate-collect-otp').value = '';
+  document.getElementById('delegate-success-title').textContent = fmtMoney(d.amount) + ' released';
+  document.getElementById('delegate-success-detail').textContent =
+    `Verified via OTP on behalf of ${senior.name}. Please collect the funds from the counter.`;
+  if(currentUser && currentUser.id === senior.id) renderDashboard();
+  goTo('screen-delegate-success');
+}
+
+// Validates the withdraw form, then hands off to a face-verification step
+// before any money actually moves.
+function confirmWithdraw(){
+  const msg = document.getElementById('withdraw-msg');
+  const amt = Number(document.getElementById('withdraw-amt').value);
+  if(!amt || amt<=0){ msg.textContent='Enter a valid amount.'; msg.className='modal-msg err'; return; }
+  if(amt > currentUser.balance){ msg.textContent='Insufficient balance.'; msg.className='modal-msg err'; return; }
+  pendingAction = { type:'withdraw', amount:amt };
+  closeModal('withdraw');
+  openVerifyModal('Withdraw ' + fmtMoney(amt), 'Scan your face to authorize this withdrawal.');
+}
+
+// Validates the send form, then hands off to a face-verification step
+// before any money actually moves.
+function confirmSend(){
+  const msg = document.getElementById('send-msg');
+  const amt = Number(document.getElementById('send-amt').value);
+  const sel = document.getElementById('send-recipient-select');
+  if(!amt || amt<=0){ msg.textContent='Enter a valid amount.'; msg.className='modal-msg err'; return; }
+  if(amt > currentUser.balance){ msg.textContent='Insufficient balance.'; msg.className='modal-msg err'; return; }
+
+  let recipientId = null, recipientLabel;
+  if(sel.value === '__external'){
+    const name = document.getElementById('send-external-name').value.trim();
+    if(!name){ msg.textContent='Enter a recipient name.'; msg.className='modal-msg err'; return; }
+    recipientLabel = name;
+  } else {
+    const recipient = users.find(u=>u.id===sel.value);
+    recipientId = recipient.id;
+    recipientLabel = recipient.name;
+  }
+  pendingAction = { type:'send', amount:amt, recipientId, recipientLabel };
+  closeModal('send');
+  openVerifyModal('Send ' + fmtMoney(amt) + ' to ' + recipientLabel, 'Scan your face to authorize this transfer.');
+}
+
+/* ============================================================
+   FACE VERIFICATION GATE (withdraw / send)
+   ============================================================ */
+let pendingAction = null;
+let verifyStream, verifyRing, verifyDetectLoop;
+
+async function openVerifyModal(title, lead){
+  document.getElementById('verify-title').textContent = title;
+  document.getElementById('verify-lead').textContent = lead;
+  document.getElementById('verify-msg').textContent = '';
+  document.getElementById('verify-pin-block').style.display = 'none';
+  document.getElementById('modal-verify').classList.add('active');
+
+  const video = document.getElementById('verify-video');
+  const errEl = document.getElementById('verify-cam-error');
+  const statusEl = document.getElementById('verify-scan-status');
+  const btn = document.getElementById('verify-capture-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'starting camera…';
+  statusEl.classList.remove('bad');
+  if(!verifyRing) verifyRing = createScanRingRenderer(document.getElementById('scan-ring-canvas-verify'), 360);
+
+  try{
+    verifyStream = await startCamera(video, errEl);
+  }catch(e){ return; }
+
+  verifyDetectLoop = setInterval(async ()=>{
+    if(!modelsReady) return;
+    const count = await countFaces(video);
+    applyFaceCountStatus(count, statusEl, btn);
+  }, 350);
+}
+
+async function captureVerifyFace(){
+  const video = document.getElementById('verify-video');
+  const statusEl = document.getElementById('verify-scan-status');
+  const msg = document.getElementById('verify-msg');
+  statusEl.textContent = 'checking against your registered face…';
+  const { count, result } = await detectSingleFaceStrict(video);
+  if(count > 1){
+    statusEl.textContent = 'two faces detected — only one person can authorize this';
+    statusEl.classList.add('bad');
+    return;
+  }
+  if(!result){
+    statusEl.textContent = 'no face found — try again';
+    statusEl.classList.add('bad');
+    return;
+  }
+  const dist = distanceToUser(result.descriptor, currentUser);
+  if(dist < MATCH_THRESHOLD){
+    msg.textContent = 'Verified — completing transaction…';
+    msg.className = 'modal-msg ok';
+    teardownVerify();
+    executePendingAction();
+    setTimeout(()=>closeModal('verify'), 500);
+  } else {
+    statusEl.textContent = 'face didn\'t match this account — try again';
+    statusEl.classList.add('bad');
+    msg.textContent = 'Not recognized as ' + currentUser.name + '. Realign in the circle and retry, or use the PIN fallback.';
+    msg.className = 'modal-msg err';
+  }
+}
+
+function toggleVerifyPin(){
+  const block = document.getElementById('verify-pin-block');
+  block.style.display = block.style.display === 'none' ? 'block' : 'none';
+}
+function submitVerifyPin(){
+  const msg = document.getElementById('verify-msg');
+  const pin = document.getElementById('verify-pin-input').value.trim();
+  if(pin !== currentUser.pin && pin !== currentUser.emergencyPin){
+    msg.textContent = 'Incorrect PIN.'; msg.className = 'modal-msg err';
+    return;
+  }
+  if(pin === currentUser.emergencyPin) triggerDuressAlert(currentUser);
+  msg.textContent = 'Verified — completing transaction…';
+  msg.className = 'modal-msg ok';
+  teardownVerify();
+  executePendingAction();
+  setTimeout(()=>closeModal('verify'), 500);
+}
+
+function executePendingAction(){
+  if(!pendingAction) return;
+  if(pendingAction.type === 'withdraw'){
+    currentUser.balance -= pendingAction.amount;
+    addTx(currentUser, 'Withdrawal', pendingAction.amount, 'neg', 'ATM demo · face-verified');
+    document.getElementById('withdraw-amt').value = '';
+  } else if(pendingAction.type === 'send'){
+    currentUser.balance -= pendingAction.amount;
+    addTx(currentUser, 'Sent', pendingAction.amount, 'neg', 'to ' + pendingAction.recipientLabel + ' · face-verified');
+    if(pendingAction.recipientId){
+      const recipient = users.find(u=>u.id===pendingAction.recipientId);
+      if(recipient){
+        recipient.balance += pendingAction.amount;
+        addTx(recipient, 'Received', pendingAction.amount, 'pos', 'from ' + currentUser.name);
+      }
+    }
+    document.getElementById('send-amt').value = '';
+    document.getElementById('send-external-name').value = '';
+  }
+  pendingAction = null;
+  renderDashboard();
+}
+
+function cancelVerify(){
+  teardownVerify();
+  pendingAction = null;
+  closeModal('verify');
+}
+function teardownVerify(){
+  clearInterval(verifyDetectLoop);
+  const video = document.getElementById('verify-video');
+  stopCamera(video);
+  document.getElementById('verify-pin-input').value = '';
+}
+
+function addDemoFunds(){
+  currentUser.balance += 5000;
+  addTx(currentUser, 'Top up', 5000, 'pos', 'demo funds');
+  renderDashboard();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+initBgScene();
+loadModels();
+</script>
+</body>
+</html>
